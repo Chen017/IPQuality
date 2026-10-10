@@ -1136,22 +1136,15 @@ bar_pid="$!"&&disown "$bar_pid"
 trap "kill_progress_bar" RETURN
 dbip=()
 local tmpcurlarg="$CurlARG"
-local RESPONSE=$(curl $tmpcurlarg -sL -m 10 -H 'accept: */*' -H 'accept-language: en-US,en;q=0.9' -H 'content-type: text/html;charset=UTF-8' -H 'dnt: 1' -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36' "https://db-ip.com/api/core/")
+local RESPONSE=$(curl $tmpcurlarg -sL -$1 -m 10 -H 'accept: */*' -H 'accept-language: en-US,en;q=0.9' -H 'content-type: text/html;charset=UTF-8' -H 'dnt: 1' -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36' "https://db-ip.com/api/core/")
 local tmpurl=$(echo "$RESPONSE"|sed -n 's/.*data-api-key="\([^"]*\)".*/\1/p'|head -n 1)
 [[ -z $tmpurl ]]&&return 1
 RESPONSE=$(curl $tmpcurlarg -sL -$1 -m 10 -H 'accept: */*' -H 'accept-language: en-US,en;q=0.9' -H 'content-type: text/plain;charset=UTF-8' -H 'dnt: 1' -H 'origin: https://db-ip.com' -H 'priority: u=1, i' -H 'referer: https://db-ip.com/' -H 'sec-ch-ua: "Not=A?Brand";v="99", "Google Chrome";v="151", "Chromium";v="151"' -H 'sec-ch-ua-mobile: ?0' -H 'sec-ch-ua-platform: "Windows"' -H 'sec-fetch-dest: empty' -H 'sec-fetch-mode: cors' -H 'sec-fetch-site: same-site' -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36' --data-raw '[["11.49","EUR"],["139.90","EUR"],["699.90","EUR"]]' "https://api.db-ip.com/v2/$tmpurl/self?convertCurrencies")
 echo "$RESPONSE"|jq . >/dev/null 2>&1||RESPONSE=""
-local dbip_error dbip_ip
-dbip_error=$(echo "$RESPONSE"|jq -r '.errorCode // empty')
-dbip_ip=$(echo "$RESPONSE"|jq -r '.ipAddress // empty')
-if [[ -n $dbip_error ]];then
-RESPONSE=""
-elif [[ $1 -eq 4 ]];then
-[[ $dbip_ip =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]||RESPONSE=""
-elif [[ $1 -eq 6 ]];then
-[[ $dbip_ip == *:* ]]||RESPONSE=""
-else
-RESPONSE=""
+# DB-IP public-key /self responses may not include ipAddress. Both requests
+# already use the requested connection family, so only reject explicit errors.
+if [[ -n $(echo "$RESPONSE"|jq -r '.errorCode // empty' 2>/dev/null) ]];then
+return 1
 fi
 dbip[robot]=$(echo "$RESPONSE"|jq -r '.isCrawler')
 dbip[proxy]=$(echo "$RESPONSE"|jq -r '.isProxy')
